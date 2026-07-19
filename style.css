@@ -158,6 +158,43 @@ tr.atm-row {
 .oi-bar.put { background: var(--put-dim); }
 td .cell-value { position: relative; z-index: 1; }
 
+.chart-side.otm {
+  background: rgba(255, 255, 255, 0.035);
+  border-radius: 4px;
+}
+.chart-row.atm-row {
+  background: rgba(240, 180, 41, 0.07);
+  border-radius: 4px;
+}
+
+/* ---- OI trend line chart ---- */
+.trend-svg { width: 100%; height: auto; display: block; }
+.trend-line { fill: none; stroke-width: 2; }
+.trend-line.put { stroke: var(--call); }
+.trend-line.call { stroke: var(--put); }
+.trend-line.diff { stroke: #8b5cf6; }
+.trend-dot.put { fill: var(--call); }
+.trend-dot.call { fill: var(--put); }
+.trend-dot.diff { fill: #8b5cf6; }
+.trend-label.put { fill: var(--call); }
+.trend-label.call { fill: var(--put); }
+.trend-label.diff { fill: #8b5cf6; }
+.trend-zero { stroke: var(--line); stroke-dasharray: 3, 3; }
+.trend-marker { stroke: var(--muted); stroke-dasharray: 3, 3; }
+.trend-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-item .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.legend-item .dot.put { background: var(--call); }
+.legend-item .dot.call { background: var(--put); }
+.legend-item .dot.diff { background: #8b5cf6; }
+
 .empty-state {
   text-align: center !important;
   color: var(--muted);
@@ -281,11 +318,6 @@ footer {
   margin: 10px 2px 0;
 }
 
-@media (max-width: 700px) {
-  table { font-size: 11px; }
-  thead th, tbody td { padding: 5px 6px; }
-}
-
 .notes-list {
   font-family: var(--font-mono);
   font-size: 12.5px;
@@ -297,3 +329,8 @@ footer {
   color: var(--text);
 }
 .notes-list .note-line:last-child { border-bottom: none; }
+
+@media (max-width: 700px) {
+  table { font-size: 11px; }
+  thead th, tbody td { padding: 5px 6px; }
+}
