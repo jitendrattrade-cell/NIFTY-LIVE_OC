@@ -195,6 +195,85 @@ td .cell-value { position: relative; z-index: 1; }
 .legend-item .dot.call { background: var(--put); }
 .legend-item .dot.diff { background: #8b5cf6; }
 
+.trend-line.pcr { stroke: var(--atm); }
+.trend-dot.pcr { fill: var(--atm); }
+.trend-label.pcr { fill: var(--atm); }
+.legend-item .dot.pcr { background: var(--atm); }
+
+.trend-line.straddle { stroke: #3b82f6; }
+.trend-dot.straddle { fill: #3b82f6; }
+.trend-label.straddle { fill: #3b82f6; }
+.legend-item .dot.straddle { background: #3b82f6; }
+
+/* ---- buildup signals ---- */
+.skew-line {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.buildup-table {
+  display: grid;
+  grid-template-columns: 70px 1fr 1fr;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.buildup-table .bt-head {
+  background: var(--panel);
+  color: var(--muted);
+  padding: 6px 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.buildup-table .bt-cell {
+  background: var(--panel);
+  padding: 7px 8px;
+}
+.buildup-table .bt-strike {
+  background: var(--panel);
+  padding: 7px 8px;
+  text-align: center;
+  font-weight: 600;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge.long-buildup { background: rgba(0, 212, 170, 0.18); color: var(--call); }
+.badge.short-buildup { background: rgba(255, 92, 108, 0.18); color: var(--put); }
+.badge.short-covering { background: rgba(0, 212, 170, 0.1); color: var(--call); }
+.badge.long-unwinding { background: rgba(255, 92, 108, 0.1); color: var(--put); }
+.badge.neutral { background: rgba(255, 255, 255, 0.06); color: var(--muted); }
+
+/* ---- alerts ---- */
+.alerts-panel { display: flex; flex-direction: column; gap: 8px; }
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+.alert-item .alert-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.alert-item.info .alert-dot { background: var(--atm); }
+.alert-item.bullish .alert-dot { background: var(--call); }
+.alert-item.bearish .alert-dot { background: var(--put); }
+
 .empty-state {
   text-align: center !important;
   color: var(--muted);
