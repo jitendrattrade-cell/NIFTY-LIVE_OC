@@ -239,6 +239,48 @@ footer {
   color: var(--muted);
 }
 
+/* ---- analysis panel ---- */
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.stat-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.stat-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 4px;
+}
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.stat-value.call { color: var(--call); }
+.stat-value.put { color: var(--put); }
+.stat-value.atm { color: var(--atm); }
+.stat-sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.analysis-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 10px 2px 0;
+}
+
 @media (max-width: 700px) {
   table { font-size: 11px; }
   thead th, tbody td { padding: 5px 6px; }
