@@ -90,6 +90,17 @@ function fmt(n) {
   return n.toLocaleString("en-IN");
 }
 
+// Indian lakh/crore compact format — used for OI and Volume, which run into
+// large magnitudes. LTP and percentages stay as plain numbers via fmt()/fmtPct().
+function fmtCompact(n) {
+  if (n === null || n === undefined) return "—";
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+  if (abs >= 1e7) return `${sign}${(abs / 1e7).toFixed(2)} Cr`;
+  if (abs >= 1e5) return `${sign}${(abs / 1e5).toFixed(2)} L`;
+  return fmt(n);
+}
+
 function fmtPct(n) {
   if (n === null || n === undefined) return "—";
   const sign = n > 0 ? "+" : "";
@@ -134,15 +145,15 @@ function renderTable(rows, atmIdx, strikeRange) {
     const tr = document.createElement("tr");
     if (isAtm) tr.className = "atm-row";
     tr.innerHTML = `
-      <td class="col-oi"><span class="oi-bar call" style="width:${callPct}%"></span><span class="cell-value">${fmt(callOI)}</span></td>
+      <td class="col-oi"><span class="oi-bar call" style="width:${callPct}%"></span><span class="cell-value">${fmtCompact(callOI)}</span></td>
       <td class="col-chgoi"><span class="cell-value">${fmtPct(callChgPct)}</span></td>
-      <td class="col-vol"><span class="cell-value">${fmt(num(r[COLUMNS.callVol]))}</span></td>
+      <td class="col-vol"><span class="cell-value">${fmtCompact(num(r[COLUMNS.callVol]))}</span></td>
       <td class="col-ltp"><span class="cell-value">${fmt(num(r[COLUMNS.callLTP]))}</span></td>
       <td class="strike-cell">${fmt(num(r[COLUMNS.strike]))}</td>
       <td class="col-ltp"><span class="cell-value">${fmt(num(r[COLUMNS.putLTP]))}</span></td>
-      <td class="col-vol"><span class="cell-value">${fmt(num(r[COLUMNS.putVol]))}</span></td>
+      <td class="col-vol"><span class="cell-value">${fmtCompact(num(r[COLUMNS.putVol]))}</span></td>
       <td class="col-chgoi"><span class="cell-value">${fmtPct(putChgPct)}</span></td>
-      <td class="col-oi"><span class="oi-bar put" style="width:${putPct}%"></span><span class="cell-value">${fmt(putOI)}</span></td>
+      <td class="col-oi"><span class="oi-bar put" style="width:${putPct}%"></span><span class="cell-value">${fmtCompact(putOI)}</span></td>
     `;
     tbody.appendChild(tr);
   });
@@ -191,8 +202,8 @@ function renderMirrorChart(containerId, rows, atmIdx, strikeRange, callKey, putK
 }
 
 function renderCharts(rows, atmIdx, strikeRange) {
-  renderMirrorChart("oiChart", rows, atmIdx, strikeRange, COLUMNS.callOI, COLUMNS.putOI, fmt);
-  renderMirrorChart("chgOiChart", rows, atmIdx, strikeRange, COLUMNS.callChgOI, COLUMNS.putChgOI, fmt);
+  renderMirrorChart("oiChart", rows, atmIdx, strikeRange, COLUMNS.callOI, COLUMNS.putOI, fmtCompact);
+  renderMirrorChart("chgOiChart", rows, atmIdx, strikeRange, COLUMNS.callChgOI, COLUMNS.putChgOI, fmtCompact);
 }
 
 function applyColumnVisibility() {
