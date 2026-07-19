@@ -178,6 +178,11 @@ function renderMirrorChart(containerId, rows, atmIdx, strikeRange, callKey, putK
 
   container.innerHTML = visible
     .map((r) => {
+      const originalIdx = rows.indexOf(r);
+      const isAtm = originalIdx === atmIdx;
+      const callOtm = originalIdx > atmIdx; // strikes above spot are OTM for calls
+      const putOtm = originalIdx < atmIdx;  // strikes below spot are OTM for puts
+
       const strike = fmt(num(r[COLUMNS.strike]));
       const callVal = num(r[callKey]) || 0;
       const putVal = num(r[putKey]) || 0;
@@ -186,13 +191,13 @@ function renderMirrorChart(containerId, rows, atmIdx, strikeRange, callKey, putK
       const callNeg = callVal < 0 ? "negative" : "";
       const putNeg = putVal < 0 ? "negative" : "";
       return `
-        <div class="chart-row">
-          <div class="chart-side call">
+        <div class="chart-row${isAtm ? " atm-row" : ""}">
+          <div class="chart-side call${callOtm ? " otm" : ""}">
             <span class="chart-value">${formatter(callVal)}</span>
             <div class="chart-bar call ${callNeg}" style="width:${callWidth}%"></div>
           </div>
           <div class="chart-strike">${strike}</div>
-          <div class="chart-side put">
+          <div class="chart-side put${putOtm ? " otm" : ""}">
             <div class="chart-bar put ${putNeg}" style="width:${putWidth}%"></div>
             <span class="chart-value">${formatter(putVal)}</span>
           </div>
@@ -204,6 +209,99 @@ function renderMirrorChart(containerId, rows, atmIdx, strikeRange, callKey, putK
 function renderCharts(rows, atmIdx, strikeRange) {
   renderMirrorChart("oiChart", rows, atmIdx, strikeRange, COLUMNS.callOI, COLUMNS.putOI, fmtCompact);
   renderMirrorChart("chgOiChart", rows, atmIdx, strikeRange, COLUMNS.callChgOI, COLUMNS.putChgOI, fmtCompact);
+}
+
+// ---- OI change trend chart (whole day, cumulative Chg OI vs time) ----
+function buildOiTrendSeries(snapshots) {
+  return snapshots.map((snap) => {
+    const rows = snap.rows || [];
+    let callChg = 0, putChg = 0;
+    rows.forEach((r) => {
+      callChg += num(r[COLUMNS.callChgOI]) || 0;
+      putChg += num(r[COLUMNS.putChgOI]) || 0;
+    });
+    return { time: snap.fetched_at_ist, callChg, putChg, diff: putChg - callChg };
+  });
+}
+
+function renderOiTrendChart(snapshots, currentIndex) {
+  const container = document.getElementById("oiTrendChart");
+  if (!snapshots || !snapshots.length) {
+    container.innerHTML = `<div class="empty-state">No data yet today.</div>`;
+    return;
+  }
+
+  const series = buildOiTrendSeries(snapshots);
+  const allVals = series.flatMap((s) => [s.callChg, s.putChg, s.diff]);
+  const minV = Math.min(...allVals, 0);
+  const maxV = Math.max(...allVals, 0);
+  const pad = (maxV - minV) * 0.1 || 1;
+  const yMin = minV - pad, yMax = maxV + pad;
+
+  const W = 720, H = 240, marginL = 46, marginR = 50, marginT = 14, marginB = 24;
+  const plotW = W - marginL - marginR, plotH = H - marginT - marginB;
+
+  const xFor = (i) => marginL + (i / Math.max(1, series.length - 1)) * plotW;
+  const yFor = (v) => marginT + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+  const pathFor = (key) =>
+    series.map((s, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(s[key]).toFixed(1)}`).join(" ");
+
+  const idx = currentIndex !== null && currentIndex !== undefined ? currentIndex : series.length - 1;
+  const markerX = xFor(idx).toFixed(1);
+
+  const labelIdxs = [0, Math.floor(series.length / 2), series.length - 1];
+  const timeLabels = labelIdxs
+    .map((i) => {
+      const t = series[i].time ? new Date(series[i].time) : null;
+      const label = t ? t.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
+      return `<text x="${xFor(i).toFixed(1)}" y="${H - 6}" font-size="10" fill="var(--muted)" text-anchor="middle">${label}</text>`;
+    })
+    .join("");
+
+  const yTicks = 4;
+  const yLabels = Array.from({ length: yTicks + 1 }, (_, k) => {
+    const v = yMin + ((yMax - yMin) / yTicks) * k;
+    return `<text x="${marginL - 6}" y="${yFor(v).toFixed(1)}" font-size="10" fill="var(--muted)" text-anchor="end" dominant-baseline="middle">${fmtCompact(v)}</text>`;
+  }).join("");
+
+  const endpointDot = (key, cls) => {
+    const v = series[idx][key];
+    const y = yFor(v).toFixed(1);
+    return `
+      <circle cx="${markerX}" cy="${y}" r="4" class="trend-dot ${cls}"></circle>
+      <text x="${Number(markerX) + 8}" y="${y}" font-size="11" class="trend-label ${cls}" dominant-baseline="middle">${fmtCompact(v)}</text>`;
+  };
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" class="trend-svg">
+      <line x1="${marginL}" y1="${yFor(0).toFixed(1)}" x2="${W - marginR}" y2="${yFor(0).toFixed(1)}" class="trend-zero" />
+      <line x1="${markerX}" y1="${marginT}" x2="${markerX}" y2="${H - marginB}" class="trend-marker" />
+      ${yLabels}
+      ${timeLabels}
+      <path d="${pathFor("putChg")}" class="trend-line put"></path>
+      <path d="${pathFor("callChg")}" class="trend-line call"></path>
+      <path d="${pathFor("diff")}" class="trend-line diff"></path>
+      ${endpointDot("putChg", "put")}
+      ${endpointDot("callChg", "call")}
+      ${endpointDot("diff", "diff")}
+    </svg>
+    <div class="trend-legend">
+      <span class="legend-item"><span class="dot put"></span>Put OI (Chg Day)</span>
+      <span class="legend-item"><span class="dot call"></span>Call OI (Chg Day)</span>
+      <span class="legend-item"><span class="dot diff"></span>PE-CE (Chg Day)</span>
+    </div>
+  `;
+}
+
+async function refreshOiTrendLive(current) {
+  const snapshots = await fetchTodaySnapshots(current);
+  if (!snapshots.length) {
+    renderOiTrendChart([current], 0); // at least show today's single point so far
+    return;
+  }
+  const idx = snapshots.findIndex((s) => s.fetched_at_ist === current.fetched_at_ist);
+  renderOiTrendChart(snapshots, idx >= 0 ? idx : snapshots.length - 1);
 }
 
 // ---- analysis: support/resistance, max pain, fresh OI buildup ----
@@ -448,6 +546,7 @@ async function loadLive() {
     const payload = await fetchJSON(DATA_URL);
     renderPayload(payload);
     refreshMarketNotesLive(payload);
+    refreshOiTrendLive(payload);
   } catch (e) {
     console.error("Failed to load live data", e);
   }
@@ -496,6 +595,7 @@ async function loadHistoryDay(date) {
     renderPayload(currentDaySnapshots[currentDaySnapshots.length - 1]);
     const prev = currentDaySnapshots.length > 1 ? currentDaySnapshots[currentDaySnapshots.length - 2] : null;
     renderMarketNotes(generateMarketNotes(currentDaySnapshots[currentDaySnapshots.length - 1], prev));
+    renderOiTrendChart(currentDaySnapshots, currentDaySnapshots.length - 1);
   }
 }
 
@@ -526,6 +626,7 @@ function initControls() {
       renderPayload(currentDaySnapshots[i]);
       const prev = i > 0 ? currentDaySnapshots[i - 1] : null;
       renderMarketNotes(generateMarketNotes(currentDaySnapshots[i], prev));
+      renderOiTrendChart(currentDaySnapshots, i);
     }
   });
 
