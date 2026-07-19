@@ -310,7 +310,6 @@ function renderAnalysis(rows, atmIdx) {
   container.innerHTML = cards.join("");
 }
 
-
 function applyColumnVisibility() {
   const table = document.getElementById("chainTable");
   table.classList.toggle("hide-oi", !visibleCols.oi);
@@ -331,6 +330,34 @@ function initColumnToggles() {
       visibleCols[cb.dataset.col] = cb.checked;
       applyColumnVisibility();
     });
+  });
+}
+
+// ---- notes: saved locally in this browser, no backend involved ----
+const NOTES_KEY = "niftyOptionChainNotes";
+let notesSaveTimer = null;
+
+function initNotes() {
+  const box = document.getElementById("notesBox");
+  const status = document.getElementById("notesStatus");
+  try {
+    const saved = localStorage.getItem(NOTES_KEY);
+    if (saved) box.value = saved;
+  } catch (e) {
+    status.textContent = "Notes storage unavailable in this browser.";
+  }
+
+  box.addEventListener("input", () => {
+    clearTimeout(notesSaveTimer);
+    notesSaveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(NOTES_KEY, box.value);
+        const t = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+        status.textContent = `Saved locally at ${t}`;
+      } catch (e) {
+        status.textContent = "Could not save — storage full or disabled.";
+      }
+    }, 500);
   });
 }
 
@@ -431,6 +458,7 @@ function initControls() {
 
 (async function init() {
   initControls();
+  initNotes();
   await populateHistoryDropdown();
   await loadLive();
   liveTimer = setInterval(loadLive, 60_000); // frontend polls every minute; actual data cadence is set by the GitHub Action
