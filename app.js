@@ -211,49 +211,35 @@ function renderCharts(rows, atmIdx, strikeRange) {
   renderMirrorChart("chgOiChart", rows, atmIdx, strikeRange, COLUMNS.callChgOI, COLUMNS.putChgOI, fmtCompact);
 }
 
-// ---- OI change trend chart (whole day, cumulative Chg OI vs time) ----
-function buildOiTrendSeries(snapshots) {
-  return snapshots.map((snap) => {
-    const rows = snap.rows || [];
-    let callChg = 0, putChg = 0;
-    rows.forEach((r) => {
-      callChg += num(r[COLUMNS.callChgOI]) || 0;
-      putChg += num(r[COLUMNS.putChgOI]) || 0;
-    });
-    return { time: snap.fetched_at_ist, callChg, putChg, diff: putChg - callChg };
-  });
-}
-
-function renderOiTrendChart(snapshots, currentIndex) {
-  const container = document.getElementById("oiTrendChart");
-  if (!snapshots || !snapshots.length) {
+// ---- generic trend line chart (used for OI trend, PCR trend, straddle trend) ----
+function renderTrendChart(containerId, points, seriesDefs, currentIndex) {
+  const container = document.getElementById(containerId);
+  if (!points || !points.length) {
     container.innerHTML = `<div class="empty-state">No data yet today.</div>`;
     return;
   }
 
-  const series = buildOiTrendSeries(snapshots);
-  const allVals = series.flatMap((s) => [s.callChg, s.putChg, s.diff]);
+  const allVals = points.flatMap((p) => seriesDefs.map((d) => p[d.key] ?? 0));
   const minV = Math.min(...allVals, 0);
   const maxV = Math.max(...allVals, 0);
   const pad = (maxV - minV) * 0.1 || 1;
   const yMin = minV - pad, yMax = maxV + pad;
 
-  const W = 720, H = 240, marginL = 46, marginR = 50, marginT = 14, marginB = 24;
+  const W = 720, H = 220, marginL = 46, marginR = 54, marginT = 14, marginB = 24;
   const plotW = W - marginL - marginR, plotH = H - marginT - marginB;
-
-  const xFor = (i) => marginL + (i / Math.max(1, series.length - 1)) * plotW;
+  const xFor = (i) => marginL + (i / Math.max(1, points.length - 1)) * plotW;
   const yFor = (v) => marginT + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
   const pathFor = (key) =>
-    series.map((s, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(s[key]).toFixed(1)}`).join(" ");
+    points.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(i).toFixed(1)} ${yFor(p[key] ?? 0).toFixed(1)}`).join(" ");
 
-  const idx = currentIndex !== null && currentIndex !== undefined ? currentIndex : series.length - 1;
+  const idx = currentIndex !== null && currentIndex !== undefined ? currentIndex : points.length - 1;
   const markerX = xFor(idx).toFixed(1);
 
-  const labelIdxs = [0, Math.floor(series.length / 2), series.length - 1];
+  const labelIdxs = [0, Math.floor(points.length / 2), points.length - 1];
   const timeLabels = labelIdxs
     .map((i) => {
-      const t = series[i].time ? new Date(series[i].time) : null;
+      const t = points[i].time ? new Date(points[i].time) : null;
       const label = t ? t.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
       return `<text x="${xFor(i).toFixed(1)}" y="${H - 6}" font-size="10" fill="var(--muted)" text-anchor="middle">${label}</text>`;
     })
@@ -262,16 +248,25 @@ function renderOiTrendChart(snapshots, currentIndex) {
   const yTicks = 4;
   const yLabels = Array.from({ length: yTicks + 1 }, (_, k) => {
     const v = yMin + ((yMax - yMin) / yTicks) * k;
-    return `<text x="${marginL - 6}" y="${yFor(v).toFixed(1)}" font-size="10" fill="var(--muted)" text-anchor="end" dominant-baseline="middle">${fmtCompact(v)}</text>`;
+    const fmtFn = seriesDefs[0].fmt || fmt;
+    return `<text x="${marginL - 6}" y="${yFor(v).toFixed(1)}" font-size="10" fill="var(--muted)" text-anchor="end" dominant-baseline="middle">${fmtFn(v)}</text>`;
   }).join("");
 
-  const endpointDot = (key, cls) => {
-    const v = series[idx][key];
-    const y = yFor(v).toFixed(1);
-    return `
-      <circle cx="${markerX}" cy="${y}" r="4" class="trend-dot ${cls}"></circle>
-      <text x="${Number(markerX) + 8}" y="${y}" font-size="11" class="trend-label ${cls}" dominant-baseline="middle">${fmtCompact(v)}</text>`;
-  };
+  const lines = seriesDefs.map((d) => `<path d="${pathFor(d.key)}" class="trend-line ${d.cls}"></path>`).join("");
+  const dots = seriesDefs
+    .map((d) => {
+      const v = points[idx][d.key] ?? 0;
+      const y = yFor(v).toFixed(1);
+      const fmtFn = d.fmt || fmt;
+      return `
+        <circle cx="${markerX}" cy="${y}" r="4" class="trend-dot ${d.cls}"></circle>
+        <text x="${Number(markerX) + 8}" y="${y}" font-size="11" class="trend-label ${d.cls}" dominant-baseline="middle">${fmtFn(v)}</text>`;
+    })
+    .join("");
+
+  const legendHtml = `<div class="trend-legend">${seriesDefs
+    .map((d) => `<span class="legend-item"><span class="dot ${d.cls}"></span>${d.label}</span>`)
+    .join("")}</div>`;
 
   container.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" class="trend-svg">
@@ -279,30 +274,54 @@ function renderOiTrendChart(snapshots, currentIndex) {
       <line x1="${markerX}" y1="${marginT}" x2="${markerX}" y2="${H - marginB}" class="trend-marker" />
       ${yLabels}
       ${timeLabels}
-      <path d="${pathFor("putChg")}" class="trend-line put"></path>
-      <path d="${pathFor("callChg")}" class="trend-line call"></path>
-      <path d="${pathFor("diff")}" class="trend-line diff"></path>
-      ${endpointDot("putChg", "put")}
-      ${endpointDot("callChg", "call")}
-      ${endpointDot("diff", "diff")}
+      ${lines}
+      ${dots}
     </svg>
-    <div class="trend-legend">
-      <span class="legend-item"><span class="dot put"></span>Put OI (Chg Day)</span>
-      <span class="legend-item"><span class="dot call"></span>Call OI (Chg Day)</span>
-      <span class="legend-item"><span class="dot diff"></span>PE-CE (Chg Day)</span>
-    </div>
+    ${legendHtml}
   `;
 }
 
-async function refreshOiTrendLive(current) {
-  const snapshots = await fetchTodaySnapshots(current);
-  if (!snapshots.length) {
-    renderOiTrendChart([current], 0); // at least show today's single point so far
-    return;
-  }
-  const idx = snapshots.findIndex((s) => s.fetched_at_ist === current.fetched_at_ist);
-  renderOiTrendChart(snapshots, idx >= 0 ? idx : snapshots.length - 1);
+function renderOiTrendChart(snapshots, currentIndex) {
+  const points = snapshots.map((snap) => {
+    const rows = snap.rows || [];
+    let callChg = 0, putChg = 0;
+    rows.forEach((r) => {
+      callChg += num(r[COLUMNS.callChgOI]) || 0;
+      putChg += num(r[COLUMNS.putChgOI]) || 0;
+    });
+    return { time: snap.fetched_at_ist, callChg, putChg, diff: putChg - callChg };
+  });
+  renderTrendChart("oiTrendChart", points, [
+    { key: "putChg", label: "Put OI (Chg Day)", cls: "put", fmt: fmtCompact },
+    { key: "callChg", label: "Call OI (Chg Day)", cls: "call", fmt: fmtCompact },
+    { key: "diff", label: "PE-CE (Chg Day)", cls: "diff", fmt: fmtCompact },
+  ], currentIndex);
 }
+
+function renderPcrTrendChart(snapshots, currentIndex) {
+  const points = snapshots.map((snap) => ({
+    time: snap.fetched_at_ist,
+    pcr: Number(computePCR(snap.rows || [])) || 0,
+  }));
+  renderTrendChart("pcrTrendChart", points, [
+    { key: "pcr", label: "PCR", cls: "pcr", fmt: (v) => v.toFixed(2) },
+  ], currentIndex);
+}
+
+function renderStraddleTrendChart(snapshots, currentIndex) {
+  const points = snapshots.map((snap) => {
+    const rows = snap.rows || [];
+    const atmIdx = computeATMIndex(rows);
+    const straddle =
+      atmIdx >= 0 ? (num(rows[atmIdx][COLUMNS.callLTP]) || 0) + (num(rows[atmIdx][COLUMNS.putLTP]) || 0) : 0;
+    return { time: snap.fetched_at_ist, straddle };
+  });
+  renderTrendChart("straddleTrendChart", points, [
+    { key: "straddle", label: "ATM Straddle Premium", cls: "straddle", fmt: fmt },
+  ], currentIndex);
+}
+
+
 
 // ---- analysis: support/resistance, max pain, fresh OI buildup ----
 const NEAR_ATM_WINDOW = 4; // how many strikes out from ATM counts as "near"
@@ -408,6 +427,166 @@ function renderAnalysis(rows, atmIdx) {
   container.innerHTML = cards.join("");
 }
 
+
+// ---- 1. Long/Short buildup classification (near ATM, vs previous run) ----
+function classifyBuildup(dOI, dLTP) {
+  if (!dOI || !dLTP) return { label: "Neutral", cls: "neutral" };
+  if (dOI > 0 && dLTP > 0) return { label: "Long Buildup", cls: "long-buildup" };
+  if (dOI > 0 && dLTP < 0) return { label: "Short Buildup", cls: "short-buildup" };
+  if (dOI < 0 && dLTP > 0) return { label: "Short Covering", cls: "short-covering" };
+  if (dOI < 0 && dLTP < 0) return { label: "Long Unwinding", cls: "long-unwinding" };
+  return { label: "Neutral", cls: "neutral" };
+}
+
+function renderBuildupSignals(current, previous) {
+  const skewEl = document.getElementById("oiSkew");
+  const tableEl = document.getElementById("buildupTable");
+  const rows = current.rows || [];
+  const atmIdx = computeATMIndex(rows);
+
+  if (!previous || atmIdx < 0) {
+    skewEl.textContent = previous ? "Not enough data yet." : "First snapshot today — signals appear from the next run.";
+    tableEl.innerHTML = "";
+    return;
+  }
+
+  const prevByStrike = {};
+  (previous.rows || []).forEach((r) => {
+    const s = num(r[COLUMNS.strike]);
+    if (s !== null) prevByStrike[s] = r;
+  });
+
+  const lo = Math.max(0, atmIdx - NEAR_ATM_WINDOW);
+  const hi = Math.min(rows.length - 1, atmIdx + NEAR_ATM_WINDOW);
+
+  let callBuildupSum = 0, putBuildupSum = 0;
+  const cells = [`<div class="bt-head">Strike</div><div class="bt-head">Call</div><div class="bt-head">Put</div>`];
+
+  for (let i = lo; i <= hi; i++) {
+    const row = rows[i];
+    const strike = num(row[COLUMNS.strike]);
+    const prevRow = prevByStrike[strike];
+    if (!prevRow || strike === null) continue;
+
+    const dCallOI = (num(row[COLUMNS.callOI]) || 0) - (num(prevRow[COLUMNS.callOI]) || 0);
+    const dCallLTP = (num(row[COLUMNS.callLTP]) || 0) - (num(prevRow[COLUMNS.callLTP]) || 0);
+    const dPutOI = (num(row[COLUMNS.putOI]) || 0) - (num(prevRow[COLUMNS.putOI]) || 0);
+    const dPutLTP = (num(row[COLUMNS.putLTP]) || 0) - (num(prevRow[COLUMNS.putLTP]) || 0);
+
+    const callSig = classifyBuildup(dCallOI, dCallLTP);
+    const putSig = classifyBuildup(dPutOI, dPutLTP);
+
+    // skew: call-side buildup only counts above ATM, put-side buildup only counts below ATM
+    if (i >= atmIdx) callBuildupSum += Math.max(0, dCallOI);
+    if (i <= atmIdx) putBuildupSum += Math.max(0, dPutOI);
+
+    cells.push(`
+      <div class="bt-strike">${fmt(strike)}${i === atmIdx ? " •" : ""}</div>
+      <div class="bt-cell"><span class="badge ${callSig.cls}">${callSig.label}</span></div>
+      <div class="bt-cell"><span class="badge ${putSig.cls}">${putSig.label}</span></div>
+    `);
+  }
+
+  tableEl.innerHTML = cells.join("");
+
+  // ---- 5. OI skew (directional bias near ATM) ----
+  const diff = callBuildupSum - putBuildupSum;
+  const total = callBuildupSum + putBuildupSum;
+  let skewText;
+  if (total === 0) {
+    skewText = "No fresh OI buildup near ATM since the last run.";
+  } else {
+    const pct = ((Math.abs(diff) / total) * 100).toFixed(0);
+    if (Math.abs(diff) < total * 0.15) {
+      skewText = `Balanced buildup near ATM — Call side ${fmtCompact(callBuildupSum)}, Put side ${fmtCompact(putBuildupSum)}.`;
+    } else if (diff > 0) {
+      skewText = `Call-side OI building faster near ATM (+${fmtCompact(callBuildupSum)} vs +${fmtCompact(putBuildupSum)} on puts, ${pct}% skew) — resistance strengthening.`;
+    } else {
+      skewText = `Put-side OI building faster near ATM (+${fmtCompact(putBuildupSum)} vs +${fmtCompact(callBuildupSum)} on calls, ${pct}% skew) — support strengthening.`;
+    }
+  }
+  skewEl.textContent = skewText;
+}
+
+// ---- 4. Most active strikes by volume ----
+function renderMostActive(current) {
+  const container = document.getElementById("mostActive");
+  const rows = current.rows || [];
+  if (!rows.length) {
+    container.innerHTML = `<div class="empty-state">No data yet.</div>`;
+    return;
+  }
+
+  const withVol = rows
+    .map((r) => ({
+      strike: num(r[COLUMNS.strike]),
+      callVol: num(r[COLUMNS.callVol]) || 0,
+      putVol: num(r[COLUMNS.putVol]) || 0,
+    }))
+    .filter((r) => r.strike !== null);
+
+  withVol.forEach((r) => (r.totalVol = r.callVol + r.putVol));
+  withVol.sort((a, b) => b.totalVol - a.totalVol);
+  const top3 = withVol.slice(0, 3);
+
+  container.innerHTML = top3
+    .map((r, i) =>
+      statCard(
+        `#${i + 1} by Volume`,
+        fmt(r.strike),
+        `Call ${fmtCompact(r.callVol)} · Put ${fmtCompact(r.putVol)}`,
+        "atm"
+      )
+    )
+    .join("");
+}
+
+// ---- 6. Threshold alerts ----
+function renderAlerts(current, dayFirstSnapshot) {
+  const container = document.getElementById("alertsPanel");
+  const rows = current.rows || [];
+  const atmIdx = computeATMIndex(rows);
+  const alerts = [];
+
+  const pcr = Number(computePCR(rows));
+  if (!Number.isNaN(pcr)) {
+    if (pcr > 1.3) alerts.push({ cls: "bearish", text: `PCR is high at ${pcr.toFixed(2)} — put writing dominant today.` });
+    else if (pcr < 0.7) alerts.push({ cls: "bullish", text: `PCR is low at ${pcr.toFixed(2)} — call writing dominant today.` });
+  }
+
+  if (dayFirstSnapshot && atmIdx >= 0) {
+    const { overallResistance, overallSupport } = computeSupportResistance(rows, atmIdx);
+    const firstRows = dayFirstSnapshot.rows || [];
+    const firstByStrike = {};
+    firstRows.forEach((r) => {
+      const s = num(r[COLUMNS.strike]);
+      if (s !== null) firstByStrike[s] = r;
+    });
+
+    if (overallResistance) {
+      const firstRow = firstByStrike[overallResistance.strike];
+      const firstOI = firstRow ? num(firstRow[COLUMNS.callOI]) || 0 : null;
+      if (firstOI && overallResistance.oi > firstOI * 1.2) {
+        const pct = (((overallResistance.oi - firstOI) / firstOI) * 100).toFixed(0);
+        alerts.push({ cls: "bearish", text: `Resistance at ${fmt(overallResistance.strike)} has grown +${pct}% today.` });
+      }
+    }
+    if (overallSupport) {
+      const firstRow = firstByStrike[overallSupport.strike];
+      const firstOI = firstRow ? num(firstRow[COLUMNS.putOI]) || 0 : null;
+      if (firstOI && overallSupport.oi > firstOI * 1.2) {
+        const pct = (((overallSupport.oi - firstOI) / firstOI) * 100).toFixed(0);
+        alerts.push({ cls: "bullish", text: `Support at ${fmt(overallSupport.strike)} has grown +${pct}% today.` });
+      }
+    }
+  }
+
+  if (!alerts.length) alerts.push({ cls: "info", text: "No threshold alerts right now." });
+
+  container.innerHTML = alerts
+    .map((a) => `<div class="alert-item ${a.cls}"><span class="alert-dot"></span>${a.text}</div>`)
+    .join("");
+}
 
 function applyColumnVisibility() {
   const table = document.getElementById("chainTable");
@@ -522,10 +701,24 @@ function renderMarketNotes(notes) {
   container.innerHTML = notes.map((n) => `<div class="note-line">${n}</div>`).join("");
 }
 
-async function refreshMarketNotesLive(current) {
+async function refreshLiveDerived(current) {
   const snapshots = await fetchTodaySnapshots(current);
-  const previous = findPrevInDay(snapshots, current);
+  const points = snapshots.length ? snapshots : [current];
+  const idx = snapshots.length
+    ? (() => {
+        const i = snapshots.findIndex((s) => s.fetched_at_ist === current.fetched_at_ist);
+        return i >= 0 ? i : snapshots.length - 1;
+      })()
+    : 0;
+  const previous = findPrevInDay(points, current);
+
   renderMarketNotes(generateMarketNotes(current, previous));
+  renderOiTrendChart(points, idx);
+  renderPcrTrendChart(points, idx);
+  renderStraddleTrendChart(points, idx);
+  renderBuildupSignals(current, previous);
+  renderMostActive(current);
+  renderAlerts(current, points[0]);
 }
 
 function renderPayload(payload) {
@@ -545,8 +738,7 @@ async function loadLive() {
   try {
     const payload = await fetchJSON(DATA_URL);
     renderPayload(payload);
-    refreshMarketNotesLive(payload);
-    refreshOiTrendLive(payload);
+    refreshLiveDerived(payload);
   } catch (e) {
     console.error("Failed to load live data", e);
   }
@@ -593,10 +785,20 @@ async function loadHistoryDay(date) {
   if (currentDaySnapshots.length) {
     timeSelect.value = currentDaySnapshots.length - 1; // default to latest snapshot of that day
     renderPayload(currentDaySnapshots[currentDaySnapshots.length - 1]);
-    const prev = currentDaySnapshots.length > 1 ? currentDaySnapshots[currentDaySnapshots.length - 2] : null;
-    renderMarketNotes(generateMarketNotes(currentDaySnapshots[currentDaySnapshots.length - 1], prev));
-    renderOiTrendChart(currentDaySnapshots, currentDaySnapshots.length - 1);
+    renderDerivedForReplay(currentDaySnapshots.length - 1);
   }
+}
+
+function renderDerivedForReplay(i) {
+  const current = currentDaySnapshots[i];
+  const previous = i > 0 ? currentDaySnapshots[i - 1] : null;
+  renderMarketNotes(generateMarketNotes(current, previous));
+  renderOiTrendChart(currentDaySnapshots, i);
+  renderPcrTrendChart(currentDaySnapshots, i);
+  renderStraddleTrendChart(currentDaySnapshots, i);
+  renderBuildupSignals(current, previous);
+  renderMostActive(current);
+  renderAlerts(current, currentDaySnapshots[0]);
 }
 
 function initControls() {
@@ -624,9 +826,7 @@ function initControls() {
     const i = Number(e.target.value);
     if (currentDaySnapshots[i]) {
       renderPayload(currentDaySnapshots[i]);
-      const prev = i > 0 ? currentDaySnapshots[i - 1] : null;
-      renderMarketNotes(generateMarketNotes(currentDaySnapshots[i], prev));
-      renderOiTrendChart(currentDaySnapshots, i);
+      renderDerivedForReplay(i);
     }
   });
 
