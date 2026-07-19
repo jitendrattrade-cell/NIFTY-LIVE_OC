@@ -207,13 +207,15 @@ function renderCharts(rows, atmIdx, strikeRange) {
 }
 
 // ---- analysis: support/resistance, max pain, fresh OI buildup ----
-function computeSupportResistance(rows, atmStrike) {
+const NEAR_ATM_WINDOW = 4; // how many strikes out from ATM counts as "near"
+
+function computeSupportResistance(rows, atmIdx) {
   let overallResistance = null, overallSupport = null;
   let maxCallOI = -1, maxPutOI = -1;
   let nearResistance = null, nearSupport = null;
   let nearCallOI = -1, nearPutOI = -1;
 
-  rows.forEach((r) => {
+  rows.forEach((r, i) => {
     const strike = num(r[COLUMNS.strike]);
     const callOI = num(r[COLUMNS.callOI]) || 0;
     const putOI = num(r[COLUMNS.putOI]) || 0;
@@ -222,9 +224,14 @@ function computeSupportResistance(rows, atmStrike) {
     if (callOI > maxCallOI) { maxCallOI = callOI; overallResistance = { strike, oi: callOI }; }
     if (putOI > maxPutOI) { maxPutOI = putOI; overallSupport = { strike, oi: putOI }; }
 
-    // resistance sits above (or at) spot; support sits below (or at) spot
-    if (strike >= atmStrike && callOI > nearCallOI) { nearCallOI = callOI; nearResistance = { strike, oi: callOI }; }
-    if (strike <= atmStrike && putOI > nearPutOI) { nearPutOI = putOI; nearSupport = { strike, oi: putOI }; }
+    // near-ATM window: resistance from strikes at/above ATM, support from strikes at/below ATM,
+    // both capped to NEAR_ATM_WINDOW steps away so a far-away wall doesn't get called "near"
+    if (i >= atmIdx && i <= atmIdx + NEAR_ATM_WINDOW && callOI > nearCallOI) {
+      nearCallOI = callOI; nearResistance = { strike, oi: callOI };
+    }
+    if (i <= atmIdx && i >= atmIdx - NEAR_ATM_WINDOW && putOI > nearPutOI) {
+      nearPutOI = putOI; nearSupport = { strike, oi: putOI };
+    }
   });
 
   return { nearResistance, nearSupport, overallResistance, overallSupport };
@@ -279,8 +286,7 @@ function renderAnalysis(rows, atmIdx) {
     return;
   }
 
-  const atmStrike = num(rows[atmIdx][COLUMNS.strike]);
-  const { nearResistance, nearSupport, overallResistance, overallSupport } = computeSupportResistance(rows, atmStrike);
+  const { nearResistance, nearSupport, overallResistance, overallSupport } = computeSupportResistance(rows, atmIdx);
   const maxPain = computeMaxPain(rows);
   const { topCall, topPut } = computeTopBuildup(rows);
 
