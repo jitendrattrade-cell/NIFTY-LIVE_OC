@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nifty Option Chain — Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="tape">
+    <div class="tape-item">
+      <span class="tape-label">SPOT</span>
+      <span class="tape-value" id="spotValue">—</span>
+    </div>
+    <div class="tape-item">
+      <span class="tape-label">ATM</span>
+      <span class="tape-value" id="atmValue">—</span>
+    </div>
+    <div class="tape-item">
+      <span class="tape-label">PCR</span>
+      <span class="tape-value" id="pcrValue">—</span>
+    </div>
+    <div class="tape-item tape-fresh">
+      <span class="pulse-dot" id="pulseDot"></span>
+      <span class="tape-label">UPDATED</span>
+      <span class="tape-value" id="updatedValue">—</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="panel-head">
+      <h1>Nifty Option Chain</h1>
+      <div class="controls">
+        <label for="strikeRange">Strikes</label>
+        <select id="strikeRange">
+          <option value="6">ATM ± 6</option>
+          <option value="10" selected>ATM ± 10</option>
+          <option value="0">All</option>
+        </select>
+        <label for="historyDate">Replay</label>
+        <select id="historyDate">
+          <option value="">Live</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="chainTable">
+        <thead>
+          <tr class="group-row">
+            <th colspan="4" class="calls-group">CALLS</th>
+            <th class="strike-group">STRIKE</th>
+            <th colspan="4" class="puts-group">PUTS</th>
+          </tr>
+          <tr>
+            <th>OI</th><th>Chg OI</th><th>Vol</th><th>LTP</th>
+            <th class="strike-col">—</th>
+            <th>LTP</th><th>Vol</th><th>Chg OI</th><th>OI</th>
+          </tr>
+        </thead>
+        <tbody id="chainBody">
+          <tr><td colspan="9" class="empty-state">Waiting for first data fetch…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer>
+      <span>Source data refreshed by a scheduled GitHub Action during NSE market hours. Not investment advice.</span>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
