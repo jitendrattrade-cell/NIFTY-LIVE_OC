@@ -100,6 +100,37 @@
     </section>
 
     <section class="chart-block">
+      <h2>PCR Trend (Today)</h2>
+      <div id="pcrTrendChart" class="chart"></div>
+    </section>
+
+    <section class="chart-block">
+      <h2>ATM Straddle Premium Trend (Today)</h2>
+      <div id="straddleTrendChart" class="chart"></div>
+    </section>
+
+    <section class="chart-block">
+      <h2>Buildup Signals (near ATM)</h2>
+      <div id="oiSkew" class="skew-line"></div>
+      <div id="buildupTable" class="buildup-table"></div>
+      <p class="analysis-note">
+        Long Buildup = price up + OI up. Short Buildup = price down + OI up.
+        Short Covering = price up + OI down. Long Unwinding = price down + OI down.
+        Compared against the previous run.
+      </p>
+    </section>
+
+    <section class="chart-block">
+      <h2>Most Active Strikes (Volume)</h2>
+      <div id="mostActive" class="analysis-grid"></div>
+    </section>
+
+    <section class="chart-block">
+      <h2>Alerts</h2>
+      <div id="alertsPanel" class="alerts-panel"></div>
+    </section>
+
+    <section class="chart-block">
       <h2>Market Notes</h2>
       <div id="marketNotes" class="notes-list">
         <div class="empty-state">Waiting for data…</div>
