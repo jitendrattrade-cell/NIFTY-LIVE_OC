@@ -22,9 +22,10 @@ a new markup parser.
 
 Everything else (JSON shape, history file, rotation) is ready to run.
 """
+
 import io
 import json
-import json
+import re
 import sys
 from datetime import datetime, date
 from pathlib import Path
@@ -60,6 +61,27 @@ def fetch_html(url: str) -> str:
     return resp.text
 
 
+def extract_spot(html: str) -> float | None:
+    """Best-effort scrape of the underlying spot/LTP shown elsewhere on the
+    page (outside the option-chain table). Moneycontrol doesn't expose this
+    in a single stable way, so we try a few known patterns and give up
+    cleanly if none match — the frontend falls back to showing ATM instead."""
+    patterns = [
+        r'id="Nse_Prc_tick"[^>]*>\s*([\d,]+\.\d+)',
+        r'class="[^"]*inprice1[^"]*"[^>]*>\s*([\d,]+\.\d+)',
+        r'"lastPrice"\s*:\s*"?([\d,]+\.\d+)"?',
+        r'NIFTY\s*50[^0-9]{0,40}?([\d,]{4,7}\.\d{1,2})',
+    ]
+    for pat in patterns:
+        m = re.search(pat, html, re.IGNORECASE)
+        if m:
+            try:
+                return float(m.group(1).replace(",", ""))
+            except ValueError:
+                continue
+    return None
+
+
 def extract_table(html: str, table_index: int) -> pd.DataFrame:
     tables = pd.read_html(io.StringIO(html))
     if table_index >= len(tables):
@@ -80,12 +102,13 @@ def clean_dataframe(df: pd.DataFrame) -> list[dict]:
     return df.to_dict(orient="records")
 
 
-def build_payload(rows: list[dict]) -> dict:
+def build_payload(rows: list[dict], spot: float | None) -> dict:
     now_ist = datetime.now(IST)
     return {
         "fetched_at_ist": now_ist.isoformat(),
         "fetched_at_utc": datetime.utcnow().isoformat() + "Z",
         "source": MC_URL,
+        "spot": spot,
         "row_count": len(rows),
         "rows": rows,
     }
@@ -133,12 +156,13 @@ def main() -> int:
     html = fetch_html(MC_URL)
     df = extract_table(html, TABLE_INDEX)
     rows = clean_dataframe(df)
-    payload = build_payload(rows)
+    spot = extract_spot(html)
+    payload = build_payload(rows, spot)
 
     write_latest(payload)
     append_history(payload)
 
-    print(f"Fetched {len(rows)} rows at {payload['fetched_at_ist']}")
+    print(f"Fetched {len(rows)} rows at {payload['fetched_at_ist']} (spot={spot})")
     return 0
 
 
