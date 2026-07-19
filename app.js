@@ -206,6 +206,105 @@ function renderCharts(rows, atmIdx, strikeRange) {
   renderMirrorChart("chgOiChart", rows, atmIdx, strikeRange, COLUMNS.callChgOI, COLUMNS.putChgOI, fmtCompact);
 }
 
+// ---- analysis: support/resistance, max pain, fresh OI buildup ----
+function computeSupportResistance(rows, atmStrike) {
+  let overallResistance = null, overallSupport = null;
+  let maxCallOI = -1, maxPutOI = -1;
+  let nearResistance = null, nearSupport = null;
+  let nearCallOI = -1, nearPutOI = -1;
+
+  rows.forEach((r) => {
+    const strike = num(r[COLUMNS.strike]);
+    const callOI = num(r[COLUMNS.callOI]) || 0;
+    const putOI = num(r[COLUMNS.putOI]) || 0;
+    if (strike === null) return;
+
+    if (callOI > maxCallOI) { maxCallOI = callOI; overallResistance = { strike, oi: callOI }; }
+    if (putOI > maxPutOI) { maxPutOI = putOI; overallSupport = { strike, oi: putOI }; }
+
+    // resistance sits above (or at) spot; support sits below (or at) spot
+    if (strike >= atmStrike && callOI > nearCallOI) { nearCallOI = callOI; nearResistance = { strike, oi: callOI }; }
+    if (strike <= atmStrike && putOI > nearPutOI) { nearPutOI = putOI; nearSupport = { strike, oi: putOI }; }
+  });
+
+  return { nearResistance, nearSupport, overallResistance, overallSupport };
+}
+
+function computeMaxPain(rows) {
+  const strikes = rows.map((r) => num(r[COLUMNS.strike])).filter((s) => s !== null);
+  let minPain = Infinity, maxPainStrike = null;
+
+  strikes.forEach((K) => {
+    let pain = 0;
+    rows.forEach((r) => {
+      const S = num(r[COLUMNS.strike]);
+      if (S === null) return;
+      const callOI = num(r[COLUMNS.callOI]) || 0;
+      const putOI = num(r[COLUMNS.putOI]) || 0;
+      if (K > S) pain += (K - S) * callOI;
+      if (S > K) pain += (S - K) * putOI;
+    });
+    if (pain < minPain) { minPain = pain; maxPainStrike = K; }
+  });
+
+  return maxPainStrike;
+}
+
+function computeTopBuildup(rows) {
+  let topCall = null, topPut = null;
+  rows.forEach((r) => {
+    const strike = num(r[COLUMNS.strike]);
+    if (strike === null) return;
+    const callChg = num(r[COLUMNS.callChgOI]) || 0;
+    const putChg = num(r[COLUMNS.putChgOI]) || 0;
+    if (!topCall || callChg > topCall.chg) topCall = { strike, chg: callChg };
+    if (!topPut || putChg > topPut.chg) topPut = { strike, chg: putChg };
+  });
+  return { topCall, topPut };
+}
+
+function statCard(label, value, sub, cls) {
+  return `
+    <div class="stat-card">
+      <span class="stat-label">${label}</span>
+      <span class="stat-value ${cls || ""}">${value}</span>
+      ${sub ? `<span class="stat-sub">${sub}</span>` : ""}
+    </div>`;
+}
+
+function renderAnalysis(rows, atmIdx) {
+  const container = document.getElementById("analysisPanel");
+  if (!rows.length || atmIdx < 0) {
+    container.innerHTML = `<div class="empty-state">Not enough data yet.</div>`;
+    return;
+  }
+
+  const atmStrike = num(rows[atmIdx][COLUMNS.strike]);
+  const { nearResistance, nearSupport, overallResistance, overallSupport } = computeSupportResistance(rows, atmStrike);
+  const maxPain = computeMaxPain(rows);
+  const { topCall, topPut } = computeTopBuildup(rows);
+
+  const cards = [
+    statCard("Resistance (near ATM)", nearResistance ? fmt(nearResistance.strike) : "—",
+      nearResistance ? `Call OI ${fmtCompact(nearResistance.oi)}` : "", "call"),
+    statCard("Support (near ATM)", nearSupport ? fmt(nearSupport.strike) : "—",
+      nearSupport ? `Put OI ${fmtCompact(nearSupport.oi)}` : "", "put"),
+    statCard("Strongest Resistance", overallResistance ? fmt(overallResistance.strike) : "—",
+      overallResistance ? `Call OI ${fmtCompact(overallResistance.oi)}` : "", "call"),
+    statCard("Strongest Support", overallSupport ? fmt(overallSupport.strike) : "—",
+      overallSupport ? `Put OI ${fmtCompact(overallSupport.oi)}` : "", "put"),
+    statCard("Max Pain", maxPain !== null ? fmt(maxPain) : "—",
+      "Where writers' payout is lowest", "atm"),
+    statCard("Fresh Call Writing", topCall ? fmt(topCall.strike) : "—",
+      topCall ? `+${fmtCompact(topCall.chg)} OI added` : "", "call"),
+    statCard("Fresh Put Writing", topPut ? fmt(topPut.strike) : "—",
+      topPut ? `+${fmtCompact(topPut.chg)} OI added` : "", "put"),
+  ];
+
+  container.innerHTML = cards.join("");
+}
+
+
 function applyColumnVisibility() {
   const table = document.getElementById("chainTable");
   table.classList.toggle("hide-oi", !visibleCols.oi);
@@ -239,6 +338,7 @@ function renderPayload(payload) {
   setFreshness(payload.fetched_at_ist);
   renderTable(rows, atmIdx, strikeRange);
   renderCharts(rows, atmIdx, strikeRange);
+  renderAnalysis(rows, atmIdx);
 }
 
 async function loadLive() {
