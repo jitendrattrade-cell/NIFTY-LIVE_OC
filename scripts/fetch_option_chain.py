@@ -22,7 +22,8 @@ a new markup parser.
 
 Everything else (JSON shape, history file, rotation) is ready to run.
 """
-
+import io
+import json
 import json
 import sys
 from datetime import datetime, date
@@ -60,7 +61,7 @@ def fetch_html(url: str) -> str:
 
 
 def extract_table(html: str, table_index: int) -> pd.DataFrame:
-    tables = pd.read_html(html)
+    tables = pd.read_html(io.StringIO(html))
     if table_index >= len(tables):
         raise IndexError(
             f"Page only has {len(tables)} <table> tags; "
