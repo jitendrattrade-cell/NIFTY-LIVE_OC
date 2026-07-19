@@ -12,12 +12,12 @@
  */
  
 const COLUMNS = {
-  strike: "Strike Price",
+  strike: "Strike  Price",
   callOI: "OI",
   callChgOI: "OI  Change",
   callVol: "Volume",
   callLTP: "LTP",
-  putLTP: "LTP.1",       // pandas suffixes duplicate header names like this
+  putLTP: "LTP.1",
   putVol: "Volume.1",
   putChgOI: "OI  Change.1",
   putOI: "OI.1",
