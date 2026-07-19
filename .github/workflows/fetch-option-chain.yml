@@ -1,2 +1,43 @@
-schedule:
-  - cron: "*/5 3-10 * * 1-5"
+name: Fetch Nifty Option Chain
+
+on:
+  schedule:
+    - cron: "*/5 3-10 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-option-chain
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run scraper
+        run: python scripts/fetch_option_chain.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "option-chain-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No data changes to commit"
+          else
+            git commit -m "Update option chain data $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git push
+          fi
