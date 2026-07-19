@@ -43,7 +43,16 @@
         <select id="historyDate">
           <option value="">Live</option>
         </select>
+        <select id="historyTime" class="hidden"></select>
       </div>
+    </div>
+
+    <div class="col-toggles">
+      <span class="toggles-label">Columns:</span>
+      <label><input type="checkbox" data-col="oi" checked /> OI</label>
+      <label><input type="checkbox" data-col="chgoi" checked /> Chg OI %</label>
+      <label><input type="checkbox" data-col="vol" checked /> Volume</label>
+      <label><input type="checkbox" data-col="ltp" checked /> LTP</label>
     </div>
 
     <div class="table-wrap">
@@ -55,9 +64,9 @@
             <th colspan="4" class="puts-group">PUTS</th>
           </tr>
           <tr>
-            <th>OI</th><th>Chg OI</th><th>Vol</th><th>LTP</th>
+            <th class="col-oi">OI</th><th class="col-chgoi">Chg OI %</th><th class="col-vol">Vol</th><th class="col-ltp">LTP</th>
             <th class="strike-col">—</th>
-            <th>LTP</th><th>Vol</th><th>Chg OI</th><th>OI</th>
+            <th class="col-ltp">LTP</th><th class="col-vol">Vol</th><th class="col-chgoi">Chg OI %</th><th class="col-oi">OI</th>
           </tr>
         </thead>
         <tbody id="chainBody">
@@ -65,6 +74,16 @@
         </tbody>
       </table>
     </div>
+
+    <section class="chart-block">
+      <h2>Open Interest by Strike</h2>
+      <div id="oiChart" class="chart"></div>
+    </section>
+
+    <section class="chart-block">
+      <h2>OI Change by Strike</h2>
+      <div id="chgOiChart" class="chart"></div>
+    </section>
 
     <footer>
       <span>Source data refreshed by a scheduled GitHub Action during NSE market hours. Not investment advice.</span>
