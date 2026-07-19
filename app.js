@@ -310,6 +310,7 @@ function renderAnalysis(rows, atmIdx) {
   container.innerHTML = cards.join("");
 }
 
+
 function applyColumnVisibility() {
   const table = document.getElementById("chainTable");
   table.classList.toggle("hide-oi", !visibleCols.oi);
@@ -333,32 +334,100 @@ function initColumnToggles() {
   });
 }
 
-// ---- notes: saved locally in this browser, no backend involved ----
-const NOTES_KEY = "niftyOptionChainNotes";
-let notesSaveTimer = null;
+// ---- market notes: auto-generated, compares this run against the previous one ----
+function findPrevInDay(snapshots, current) {
+  if (!snapshots || snapshots.length < 2) return null;
+  const idx = snapshots.findIndex((s) => s.fetched_at_ist === current.fetched_at_ist);
+  if (idx > 0) return snapshots[idx - 1];
+  if (idx === -1) return snapshots[snapshots.length - 1]; // current not in list yet — most recent stored run
+  return null; // idx === 0, this is the first run of the day
+}
 
-function initNotes() {
-  const box = document.getElementById("notesBox");
-  const status = document.getElementById("notesStatus");
+async function fetchTodaySnapshots(current) {
   try {
-    const saved = localStorage.getItem(NOTES_KEY);
-    if (saved) box.value = saved;
+    const dateStr = (current.fetched_at_ist || "").split("T")[0];
+    if (!dateStr) return [];
+    const text = await (await fetch(`${HISTORY_FILE(dateStr)}?_=${Date.now()}`)).text();
+    return text.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
   } catch (e) {
-    status.textContent = "Notes storage unavailable in this browser.";
+    return [];
+  }
+}
+
+function generateMarketNotes(current, previous) {
+  const rows = current.rows || [];
+  const atmIdx = computeATMIndex(rows);
+  if (!rows.length || atmIdx < 0) return ["Not enough data yet."];
+  if (!previous) return ["This is the first recorded snapshot today — comparison will appear from the next run."];
+
+  const prevRows = previous.rows || [];
+  const prevByStrike = {};
+  prevRows.forEach((r) => {
+    const s = num(r[COLUMNS.strike]);
+    if (s !== null) prevByStrike[s] = r;
+  });
+
+  const lo = Math.max(0, atmIdx - NEAR_ATM_WINDOW);
+  const hi = Math.min(rows.length - 1, atmIdx + NEAR_ATM_WINDOW);
+  const movers = [];
+
+  for (let i = lo; i <= hi; i++) {
+    const row = rows[i];
+    const strike = num(row[COLUMNS.strike]);
+    const prevRow = prevByStrike[strike];
+    if (!prevRow || strike === null) continue;
+
+    const dCall = (num(row[COLUMNS.callOI]) || 0) - (num(prevRow[COLUMNS.callOI]) || 0);
+    const dPut = (num(row[COLUMNS.putOI]) || 0) - (num(prevRow[COLUMNS.putOI]) || 0);
+    const tag = i === atmIdx ? " (ATM)" : "";
+
+    if (dCall !== 0) {
+      movers.push({
+        delta: dCall,
+        text: `Strike ${fmt(strike)}${tag}: Call OI ${dCall > 0 ? "added" : "unwound"} ${fmtCompact(Math.abs(dCall))} — ${dCall > 0 ? "fresh resistance building" : "resistance easing"}.`,
+      });
+    }
+    if (dPut !== 0) {
+      movers.push({
+        delta: dPut,
+        text: `Strike ${fmt(strike)}${tag}: Put OI ${dPut > 0 ? "added" : "unwound"} ${fmtCompact(Math.abs(dPut))} — ${dPut > 0 ? "fresh support building" : "support easing"}.`,
+      });
+    }
   }
 
-  box.addEventListener("input", () => {
-    clearTimeout(notesSaveTimer);
-    notesSaveTimer = setTimeout(() => {
-      try {
-        localStorage.setItem(NOTES_KEY, box.value);
-        const t = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-        status.textContent = `Saved locally at ${t}`;
-      } catch (e) {
-        status.textContent = "Could not save — storage full or disabled.";
-      }
-    }, 500);
-  });
+  movers.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const notes = movers.slice(0, 6).map((m) => m.text);
+
+  const prevAtmIdx = computeATMIndex(prevRows);
+  if (prevAtmIdx >= 0) {
+    const prevAtmStrike = num(prevRows[prevAtmIdx][COLUMNS.strike]);
+    const curAtmStrike = num(rows[atmIdx][COLUMNS.strike]);
+    if (prevAtmStrike !== null && curAtmStrike !== prevAtmStrike) {
+      const dir = curAtmStrike > prevAtmStrike ? "up" : "down";
+      notes.unshift(`ATM moved ${dir}, from ${fmt(prevAtmStrike)} to ${fmt(curAtmStrike)}, since the last run.`);
+    }
+  }
+
+  const curPcr = computePCR(rows);
+  const prevPcr = computePCR(prevRows);
+  if (curPcr !== null && prevPcr !== null && curPcr !== prevPcr) {
+    const dir = Number(curPcr) > Number(prevPcr) ? "up" : "down";
+    notes.push(`PCR moved ${dir}, from ${prevPcr} to ${curPcr}, since the last run.`);
+  }
+
+  if (!notes.length) notes.push("No notable OI movement near ATM since the last run.");
+  return notes;
+}
+
+function renderMarketNotes(notes) {
+  const container = document.getElementById("marketNotes");
+  container.innerHTML = notes.map((n) => `<div class="note-line">${n}</div>`).join("");
+}
+
+async function refreshMarketNotesLive(current) {
+  const snapshots = await fetchTodaySnapshots(current);
+  const previous = findPrevInDay(snapshots, current);
+  renderMarketNotes(generateMarketNotes(current, previous));
 }
 
 function renderPayload(payload) {
@@ -378,6 +447,7 @@ async function loadLive() {
   try {
     const payload = await fetchJSON(DATA_URL);
     renderPayload(payload);
+    refreshMarketNotesLive(payload);
   } catch (e) {
     console.error("Failed to load live data", e);
   }
@@ -424,6 +494,8 @@ async function loadHistoryDay(date) {
   if (currentDaySnapshots.length) {
     timeSelect.value = currentDaySnapshots.length - 1; // default to latest snapshot of that day
     renderPayload(currentDaySnapshots[currentDaySnapshots.length - 1]);
+    const prev = currentDaySnapshots.length > 1 ? currentDaySnapshots[currentDaySnapshots.length - 2] : null;
+    renderMarketNotes(generateMarketNotes(currentDaySnapshots[currentDaySnapshots.length - 1], prev));
   }
 }
 
@@ -450,7 +522,11 @@ function initControls() {
 
   document.getElementById("historyTime").addEventListener("change", (e) => {
     const i = Number(e.target.value);
-    if (currentDaySnapshots[i]) renderPayload(currentDaySnapshots[i]);
+    if (currentDaySnapshots[i]) {
+      renderPayload(currentDaySnapshots[i]);
+      const prev = i > 0 ? currentDaySnapshots[i - 1] : null;
+      renderMarketNotes(generateMarketNotes(currentDaySnapshots[i], prev));
+    }
   });
 
   initColumnToggles();
@@ -458,7 +534,6 @@ function initControls() {
 
 (async function init() {
   initControls();
-  initNotes();
   await populateHistoryDropdown();
   await loadLive();
   liveTimer = setInterval(loadLive, 60_000); // frontend polls every minute; actual data cadence is set by the GitHub Action
