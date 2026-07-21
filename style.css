@@ -21,6 +21,7 @@ body {
   color: var(--text);
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 /* ---- ticker tape header ---- */
@@ -94,10 +95,12 @@ h1 {
 .table-wrap {
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: 12.5px;
@@ -412,4 +415,33 @@ footer {
 @media (max-width: 700px) {
   table { font-size: 11px; }
   thead th, tbody td { padding: 5px 6px; }
+
+  main { padding: 16px 12px 36px; }
+  h1 { font-size: 17px; }
+  .panel-head { gap: 8px; }
+  .controls { gap: 6px; font-size: 12px; }
+  .controls select { padding: 5px 6px; font-size: 11px; }
+
+  .tape { gap: 18px; padding: 8px 14px; font-size: 12px; }
+  .tape-fresh { margin-left: 0; }
+
+  .chart-block { padding: 12px 12px 4px; }
+  .chart-row { grid-template-columns: 1fr 44px 1fr; font-size: 10px; }
+  .chart-value { padding: 0 3px; }
+
+  .analysis-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .stat-card { padding: 8px 10px; }
+  .stat-value { font-size: 14px; }
+
+  .buildup-table { font-size: 10.5px; grid-template-columns: 54px 1fr 1fr; }
+  .badge { padding: 2px 5px; font-size: 10px; }
+
+  .trend-legend { gap: 10px; font-size: 10px; }
+}
+
+@media (max-width: 420px) {
+  .col-toggles { gap: 10px; font-size: 11px; }
+  .tape { gap: 12px; font-size: 11px; }
+  .buildup-table { grid-template-columns: 46px 1fr 1fr; }
+  .buildup-table .bt-strike, .buildup-table .bt-cell { padding: 6px 5px; }
 }
