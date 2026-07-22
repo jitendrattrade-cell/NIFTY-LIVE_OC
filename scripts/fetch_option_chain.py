@@ -37,7 +37,7 @@ import requests
 # ---------------------------------------------------------------------------
 # CONFIG - fill in from your existing IMPORTHTML formula
 # ---------------------------------------------------------------------------
-MC_URL = "https://www.moneycontrol.com/indices/fno/view-option-chain/NIFTY/2026-07-21?"
+MC_URL = "https://www.moneycontrol.com/indices/fno/view-option-chain/NIFTY/2026-07-28?"
 TABLE_INDEX = 0  # e.g. IMPORTHTML(url, "table", 2) -> index 0 in pandas (0-based)
 
 IST = ZoneInfo("Asia/Kolkata")
