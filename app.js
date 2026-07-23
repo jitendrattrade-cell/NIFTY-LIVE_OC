@@ -6,15 +6,15 @@
  * headers — copied exactly from data/latest.json).
  */
 const COLUMNS = {
-  strike: "Strike",
-  callOI: "CE OI",
-  callChgOI: "CE Chng OI",
-  callVol: "CE Volume",
-  callLTP: "CE LTP",
-  putLTP: "PE LTP",
-  putVol: "PE Volume",
-  putChgOI: "PE Chng OI",
-  putOI: "PE OI",
+  strike: "Strike  Price",
+  callOI: "OI",
+  callChgOI: "OI  Change",
+  callVol: "Volume",
+  callLTP: "LTP",
+  putLTP: "LTP.1",
+  putVol: "Volume.1",
+  putChgOI: "OI  Change.1",
+  putOI: "OI.1",
 };
 
 const DATA_URL = "data/latest.json";
@@ -542,7 +542,8 @@ function renderMostActive(current) {
 }
 
 // ---- 6. Threshold alerts ----
-function generateAlertsForSnapshot(current, dayFirstSnapshot) {
+function renderAlerts(current, dayFirstSnapshot) {
+  const container = document.getElementById("alertsPanel");
   const rows = current.rows || [];
   const atmIdx = computeATMIndex(rows);
   const alerts = [];
@@ -580,38 +581,12 @@ function generateAlertsForSnapshot(current, dayFirstSnapshot) {
     }
   }
 
-  return alerts;
-}
+  if (!alerts.length) alerts.push({ cls: "info", text: "No threshold alerts right now." });
 
-// Full-day running log: shows every alert fired today up to (and including) uptoIdx, newest first.
-function renderAlertsLog(snapshots, uptoIdx) {
-  const container = document.getElementById("alertsPanel");
-  if (!snapshots || !snapshots.length) {
-    container.innerHTML = `<div class="empty-state">No data yet.</div>`;
-    return;
-  }
-  const dayFirst = snapshots[0];
-  const entries = [];
-
-  for (let i = 0; i <= uptoIdx; i++) {
-    const alerts = generateAlertsForSnapshot(snapshots[i], dayFirst);
-    if (!alerts.length) continue;
-    const t = snapshots[i].fetched_at_ist ? new Date(snapshots[i].fetched_at_ist) : null;
-    const timeLabel = t ? t.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
-    alerts.forEach((a) => entries.push({ ...a, time: timeLabel }));
-  }
-
-  if (!entries.length) {
-    container.innerHTML = `<div class="alert-item info"><span class="alert-dot"></span>No threshold alerts today so far.</div>`;
-    return;
-  }
-
-  container.innerHTML = entries
-    .reverse()
-    .map((a) => `<div class="alert-item ${a.cls}"><span class="alert-dot"></span><span class="alert-time">${a.time}</span><span>${a.text}</span></div>`)
+  container.innerHTML = alerts
+    .map((a) => `<div class="alert-item ${a.cls}"><span class="alert-dot"></span>${a.text}</div>`)
     .join("");
 }
-
 
 function applyColumnVisibility() {
   const table = document.getElementById("chainTable");
