@@ -6,15 +6,15 @@
  * headers — copied exactly from data/latest.json).
  */
 const COLUMNS = {
-  strike: "Strike  Price",
-  callOI: "OI",
-  callChgOI: "OI  Change",
-  callVol: "Volume",
-  callLTP: "LTP",
-  putLTP: "LTP.1",
-  putVol: "Volume.1",
-  putChgOI: "OI  Change.1",
-  putOI: "OI.1",
+  strike: "Strike",
+  callOI: "CE OI",
+  callChgOI: "CE Chng OI",
+  callVol: "CE Volume",
+  callLTP: "CE LTP",
+  putLTP: "PE LTP",
+  putVol: "PE Volume",
+  putChgOI: "PE Chng OI",
+  putOI: "PE OI",
 };
 
 const DATA_URL = "data/latest.json";
@@ -387,6 +387,35 @@ function computeTopBuildup(rows) {
   return { topCall, topPut };
 }
 
+// ---- total OI / OI change across the whole chain ----
+function computeTotals(rows) {
+  let callOI = 0, putOI = 0, callChg = 0, putChg = 0;
+  rows.forEach((r) => {
+    callOI += num(r[COLUMNS.callOI]) || 0;
+    putOI += num(r[COLUMNS.putOI]) || 0;
+    callChg += num(r[COLUMNS.callChgOI]) || 0;
+    putChg += num(r[COLUMNS.putChgOI]) || 0;
+  });
+  return { callOI, putOI, callChg, putChg };
+}
+
+function renderTotals(rows) {
+  const container = document.getElementById("totalsPanel");
+  if (!rows.length) {
+    container.innerHTML = `<div class="empty-state">No data yet.</div>`;
+    return;
+  }
+  const t = computeTotals(rows);
+  const signed = (n) => `${n >= 0 ? "+" : ""}${fmtCompact(n)}`;
+
+  container.innerHTML = [
+    statCard("Total Call OI", fmtCompact(t.callOI), "", "call"),
+    statCard("Total Put OI", fmtCompact(t.putOI), "", "put"),
+    statCard("Total Call OI Chg", signed(t.callChg), "vs previous day close", "call"),
+    statCard("Total Put OI Chg", signed(t.putChg), "vs previous day close", "put"),
+  ].join("");
+}
+
 function statCard(label, value, sub, cls) {
   return `
     <div class="stat-card">
@@ -542,8 +571,7 @@ function renderMostActive(current) {
 }
 
 // ---- 6. Threshold alerts ----
-function renderAlerts(current, dayFirstSnapshot) {
-  const container = document.getElementById("alertsPanel");
+function generateAlertsForSnapshot(current, dayFirstSnapshot) {
   const rows = current.rows || [];
   const atmIdx = computeATMIndex(rows);
   const alerts = [];
@@ -581,12 +609,38 @@ function renderAlerts(current, dayFirstSnapshot) {
     }
   }
 
-  if (!alerts.length) alerts.push({ cls: "info", text: "No threshold alerts right now." });
+  return alerts;
+}
 
-  container.innerHTML = alerts
-    .map((a) => `<div class="alert-item ${a.cls}"><span class="alert-dot"></span>${a.text}</div>`)
+// Full-day running log: shows every alert fired today up to (and including) uptoIdx, newest first.
+function renderAlertsLog(snapshots, uptoIdx) {
+  const container = document.getElementById("alertsPanel");
+  if (!snapshots || !snapshots.length) {
+    container.innerHTML = `<div class="empty-state">No data yet.</div>`;
+    return;
+  }
+  const dayFirst = snapshots[0];
+  const entries = [];
+
+  for (let i = 0; i <= uptoIdx; i++) {
+    const alerts = generateAlertsForSnapshot(snapshots[i], dayFirst);
+    if (!alerts.length) continue;
+    const t = snapshots[i].fetched_at_ist ? new Date(snapshots[i].fetched_at_ist) : null;
+    const timeLabel = t ? t.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
+    alerts.forEach((a) => entries.push({ ...a, time: timeLabel }));
+  }
+
+  if (!entries.length) {
+    container.innerHTML = `<div class="alert-item info"><span class="alert-dot"></span>No threshold alerts today so far.</div>`;
+    return;
+  }
+
+  container.innerHTML = entries
+    .reverse()
+    .map((a) => `<div class="alert-item ${a.cls}"><span class="alert-dot"></span><span class="alert-time">${a.time}</span><span>${a.text}</span></div>`)
     .join("");
 }
+
 
 function applyColumnVisibility() {
   const table = document.getElementById("chainTable");
@@ -696,9 +750,38 @@ function generateMarketNotes(current, previous) {
   return notes;
 }
 
-function renderMarketNotes(notes) {
+function renderMarketNotesLog(snapshots, uptoIdx) {
   const container = document.getElementById("marketNotes");
-  container.innerHTML = notes.map((n) => `<div class="note-line">${n}</div>`).join("");
+  if (!snapshots || !snapshots.length) {
+    container.innerHTML = `<div class="empty-state">Waiting for data…</div>`;
+    return;
+  }
+
+  const groups = [];
+  for (let i = 0; i <= uptoIdx; i++) {
+    const previous = i > 0 ? snapshots[i - 1] : null;
+    if (!previous) continue; // first run of the day has nothing to compare against
+    const notes = generateMarketNotes(snapshots[i], previous).slice(0, 3);
+    const t = snapshots[i].fetched_at_ist ? new Date(snapshots[i].fetched_at_ist) : null;
+    const timeLabel = t ? t.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
+    groups.push({ timeLabel, notes });
+  }
+
+  if (!groups.length) {
+    container.innerHTML = `<div class="empty-state">This is the first recorded snapshot today — the log builds up from the next run.</div>`;
+    return;
+  }
+
+  container.innerHTML = groups
+    .reverse()
+    .map(
+      (g) => `
+      <div class="note-group">
+        <div class="note-time">${g.timeLabel}</div>
+        ${g.notes.map((n) => `<div class="note-line">${n}</div>`).join("")}
+      </div>`
+    )
+    .join("");
 }
 
 async function refreshLiveDerived(current) {
@@ -712,13 +795,13 @@ async function refreshLiveDerived(current) {
     : 0;
   const previous = findPrevInDay(points, current);
 
-  renderMarketNotes(generateMarketNotes(current, previous));
+  renderMarketNotesLog(points, idx);
   renderOiTrendChart(points, idx);
   renderPcrTrendChart(points, idx);
   renderStraddleTrendChart(points, idx);
   renderBuildupSignals(current, previous);
   renderMostActive(current);
-  renderAlerts(current, points[0]);
+  renderAlertsLog(points, idx);
 }
 
 function renderPayload(payload) {
@@ -731,6 +814,7 @@ function renderPayload(payload) {
   setFreshness(payload.fetched_at_ist);
   renderTable(rows, atmIdx, strikeRange);
   renderCharts(rows, atmIdx, strikeRange);
+  renderTotals(rows);
   renderAnalysis(rows, atmIdx);
 }
 
@@ -761,8 +845,9 @@ async function populateHistoryDropdown() {
 
 async function loadHistoryDay(date) {
   const timeSelect = document.getElementById("historyTime");
+  const timeControls = document.getElementById("replayTimeControls");
   if (!date) {
-    timeSelect.classList.add("hidden");
+    timeControls.classList.add("hidden");
     timeSelect.innerHTML = "";
     currentDaySnapshots = [];
     return;
@@ -780,7 +865,7 @@ async function loadHistoryDay(date) {
       : `Snapshot ${i + 1}`;
     timeSelect.appendChild(opt);
   });
-  timeSelect.classList.remove("hidden");
+  timeControls.classList.remove("hidden");
 
   if (currentDaySnapshots.length) {
     timeSelect.value = currentDaySnapshots.length - 1; // default to latest snapshot of that day
@@ -792,13 +877,13 @@ async function loadHistoryDay(date) {
 function renderDerivedForReplay(i) {
   const current = currentDaySnapshots[i];
   const previous = i > 0 ? currentDaySnapshots[i - 1] : null;
-  renderMarketNotes(generateMarketNotes(current, previous));
+  renderMarketNotesLog(currentDaySnapshots, i);
   renderOiTrendChart(currentDaySnapshots, i);
   renderPcrTrendChart(currentDaySnapshots, i);
   renderStraddleTrendChart(currentDaySnapshots, i);
   renderBuildupSignals(current, previous);
   renderMostActive(current);
-  renderAlerts(current, currentDaySnapshots[0]);
+  renderAlertsLog(currentDaySnapshots, i);
 }
 
 function initControls() {
@@ -829,6 +914,18 @@ function initControls() {
       renderDerivedForReplay(i);
     }
   });
+
+  function stepReplay(delta) {
+    if (!currentDaySnapshots.length) return;
+    const timeSelect = document.getElementById("historyTime");
+    let i = Number(timeSelect.value) + delta;
+    i = Math.max(0, Math.min(currentDaySnapshots.length - 1, i));
+    timeSelect.value = i;
+    renderPayload(currentDaySnapshots[i]);
+    renderDerivedForReplay(i);
+  }
+  document.getElementById("replayPrev").addEventListener("click", () => stepReplay(-1));
+  document.getElementById("replayNext").addEventListener("click", () => stepReplay(1));
 
   initColumnToggles();
 }
