@@ -84,7 +84,37 @@
         </tbody>
       </table>
     </div>
+   <section class="chart-block">
+    <h2>OI Strength</h2>
 
+    <div class="oi-strength-card">
+
+        <div class="oi-strength-row">
+            <span>Call OI Change</span>
+            <span id="callOiStrength">0</span>
+        </div>
+
+        <div class="oi-strength-row">
+            <span>Put OI Change</span>
+            <span id="putOiStrength">0</span>
+        </div>
+
+        <div class="oi-strength-row">
+            <span>Difference</span>
+            <span id="oiDifference">0</span>
+        </div>
+
+        <div class="strength-bar">
+            <div id="strengthFill"></div>
+        </div>
+
+        <div id="strengthLabel" class="strength-label">
+            Neutral
+        </div>
+
+    </div>
+
+</section>
     <section class="chart-block">
       <h2>OI Change Trend (Today)</h2>
       <div id="oiTrendChart" class="chart"></div>
