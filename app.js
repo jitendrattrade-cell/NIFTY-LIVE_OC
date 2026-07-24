@@ -6,15 +6,15 @@
  * headers — copied exactly from data/latest.json).
  */
 const COLUMNS = {
-  strike: "Strike",
-  callOI: "CE OI",
-  callChgOI: "CE Chng OI",
-  callVol: "CE Volume",
-  callLTP: "CE LTP",
-  putLTP: "PE LTP",
-  putVol: "PE Volume",
-  putChgOI: "PE Chng OI",
-  putOI: "PE OI",
+  strike: "Strike  Price",
+  callOI: "OI",
+  callChgOI: "OI  Change",
+  callVol: "Volume",
+  callLTP: "LTP",
+  putLTP: "LTP.1",
+  putVol: "Volume.1",
+  putChgOI: "OI  Change.1",
+  putOI: "OI.1",
 };
 
 const DATA_URL = "data/latest.json";
