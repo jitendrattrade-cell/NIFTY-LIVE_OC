@@ -808,22 +808,16 @@ function renderPayload(payload) {
   const rows = payload.rows || [];
   const atmIdx = computeATMIndex(rows);
   const strikeRange = currentStrikeRange();
-
   document.getElementById("atmValue").textContent = atmIdx >= 0 ? fmt(num(rows[atmIdx][COLUMNS.strike])) : "—";
   document.getElementById("pcrValue").textContent = computePCR(rows) ?? "—";
   document.getElementById("spotValue").textContent = payload.spot ? fmt(num(payload.spot)) : "≈ ATM";
-
   setFreshness(payload.fetched_at_ist);
-
   renderTable(rows, atmIdx, strikeRange);
   renderCharts(rows, atmIdx, strikeRange);
   renderTotals(rows);
-
-  // ADD THIS LINE
-  renderOiStrength(rows);
-
   renderAnalysis(rows, atmIdx);
 }
+
 async function loadLive() {
   try {
     const payload = await fetchJSON(DATA_URL);
@@ -942,63 +936,3 @@ function initControls() {
   await loadLive();
   liveTimer = setInterval(loadLive, 60_000); // frontend polls every minute; actual data cadence is set by the GitHub Action
 })();
-
-
-function renderOiStrength(rows){
-
-let totalCE=0;
-let totalPE=0;
-
-rows.forEach(r=>{
-
-totalCE+=num(r[COLUMNS.callChgOI])||0;
-totalPE+=num(r[COLUMNS.putChgOI])||0;
-
-});
-
-const diff=totalPE-totalCE;
-
-const max=Math.max(Math.abs(totalCE),Math.abs(totalPE));
-
-const strength=(diff/max)*100;
-
-document.getElementById("callOiStrength").innerHTML=fmtCompact(totalCE);
-
-document.getElementById("putOiStrength").innerHTML=fmtCompact(totalPE);
-
-document.getElementById("oiDifference").innerHTML=fmtCompact(diff);
-
-const bar=document.getElementById("strengthFill");
-
-const label=document.getElementById("strengthLabel");
-
-const width=Math.min(Math.abs(strength),100);
-
-bar.style.width=width+"%";
-
-if(strength>10){
-
-bar.style.background="#00d084";
-
-label.innerHTML="🟢 Bullish ("+strength.toFixed(1)+"%)";
-
-}
-
-else if(strength<-10){
-
-bar.style.background="#ff4d4f";
-
-label.innerHTML="🔴 Bearish ("+strength.toFixed(1)+"%)";
-
-}
-
-else{
-
-bar.style.background="#ffaa00";
-
-label.innerHTML="🟡 Neutral";
-
-}
-
-}
-renderPayload(payload)
