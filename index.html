@@ -35,15 +35,25 @@
       <div class="controls">
         <label for="strikeRange">Strikes</label>
         <select id="strikeRange">
-          <option value="6">ATM ± 6</option>
-          <option value="10" selected>ATM ± 10</option>
+          <option value="5" selected>ATM ± 5</option>
+          <option value="10">ATM ± 10</option>
           <option value="0">All</option>
         </select>
         <label for="historyDate">Replay</label>
         <select id="historyDate">
           <option value="">Live</option>
         </select>
-        <select id="historyTime" class="hidden"></select>
+        <span id="replayTimeControls" class="hidden replay-time-controls">
+          <button id="replayPrev" class="step-btn" type="button" title="Previous snapshot">◀</button>
+          <select id="historyTime"></select>
+          <button id="replayNext" class="step-btn" type="button" title="Next snapshot">▶</button>
+        </span>
+        <a
+          class="refresh-btn"
+          href="https://github.com/YOUR-USERNAME/NIFTY-LIVE_OC/actions/workflows/fetch-option-chain.yml"
+          target="_blank"
+          rel="noopener"
+        >↻ Refresh Now</a>
       </div>
     </div>
 
@@ -88,6 +98,11 @@
     <section class="chart-block">
       <h2>OI Change by Strike</h2>
       <div id="chgOiChart" class="chart"></div>
+    </section>
+
+    <section class="chart-block">
+      <h2>Total OI Overview</h2>
+      <div id="totalsPanel" class="analysis-grid"></div>
     </section>
 
     <section class="chart-block">
