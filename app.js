@@ -808,16 +808,22 @@ function renderPayload(payload) {
   const rows = payload.rows || [];
   const atmIdx = computeATMIndex(rows);
   const strikeRange = currentStrikeRange();
+
   document.getElementById("atmValue").textContent = atmIdx >= 0 ? fmt(num(rows[atmIdx][COLUMNS.strike])) : "—";
   document.getElementById("pcrValue").textContent = computePCR(rows) ?? "—";
   document.getElementById("spotValue").textContent = payload.spot ? fmt(num(payload.spot)) : "≈ ATM";
+
   setFreshness(payload.fetched_at_ist);
+
   renderTable(rows, atmIdx, strikeRange);
   renderCharts(rows, atmIdx, strikeRange);
   renderTotals(rows);
+
+  // ADD THIS LINE
+  renderOiStrength(rows);
+
   renderAnalysis(rows, atmIdx);
 }
-
 async function loadLive() {
   try {
     const payload = await fetchJSON(DATA_URL);
@@ -995,3 +1001,4 @@ label.innerHTML="🟡 Neutral";
 }
 
 }
+renderPayload(payload)
