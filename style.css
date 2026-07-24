@@ -90,6 +90,31 @@ h1 {
   font-family: var(--font-mono);
   font-size: 12px;
 }
+.replay-time-controls { display: inline-flex; align-items: center; gap: 4px; }
+.step-btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.step-btn:hover { border-color: var(--call); color: var(--call); }
+.step-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.refresh-btn {
+  background: var(--panel);
+  color: var(--call);
+  border: 1px solid var(--call);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.refresh-btn:hover { background: var(--call-dim); }
 
 /* ---- table ---- */
 .table-wrap {
@@ -261,10 +286,10 @@ td .cell-value { position: relative; z-index: 1; }
 .badge.neutral { background: rgba(255, 255, 255, 0.06); color: var(--muted); }
 
 /* ---- alerts ---- */
-.alerts-panel { display: flex; flex-direction: column; gap: 8px; }
+.alerts-panel { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
 .alert-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 8px 10px;
   border-radius: 6px;
@@ -272,7 +297,14 @@ td .cell-value { position: relative; z-index: 1; }
   border: 1px solid var(--line);
   background: var(--bg);
 }
-.alert-item .alert-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.alert-item .alert-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.alert-item .alert-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  min-width: 62px;
+  flex-shrink: 0;
+}
 .alert-item.info .alert-dot { background: var(--atm); }
 .alert-item.bullish .alert-dot { background: var(--call); }
 .alert-item.bearish .alert-dot { background: var(--put); }
@@ -404,13 +436,18 @@ footer {
   font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.6;
+  max-height: 320px;
+  overflow-y: auto;
 }
-.notes-list .note-line {
-  padding: 7px 0;
-  border-bottom: 1px solid var(--line);
-  color: var(--text);
+.notes-list .note-group { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.notes-list .note-group:last-child { border-bottom: none; }
+.notes-list .note-time {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
 }
-.notes-list .note-line:last-child { border-bottom: none; }
+.notes-list .note-line { padding: 2px 0; color: var(--text); }
 
 @media (max-width: 700px) {
   table { font-size: 11px; }
